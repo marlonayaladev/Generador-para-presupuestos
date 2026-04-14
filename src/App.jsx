@@ -684,7 +684,7 @@ const BudgetManagementHome = () => {
                 fetchPriority="high" 
                 loading="eager" 
                 style={{ 
-                  width: '100%', 
+                  width: '150%', 
                   height: 'auto', 
                   objectFit: 'contain', 
                   mixBlendMode: 'lighten',
@@ -692,10 +692,7 @@ const BudgetManagementHome = () => {
                 }} 
               />
             </div>
-            <div className="text-center mt-4">
-              <h1 className="text-5xl font-extrabold text-[#ffcc00] tracking-widest">GAPPRE</h1>
-              <p className="mt-4 text-2xl text-zinc-300 tracking-wide font-light">Generador Automático para la Gestión del Presupuesto por Resultados</p>
-            </div>
+
             <div className="botones-container" style={{ marginTop:'4rem' }}>
               {phases.map((phase) => (
                 <button key={phase.id} className="btn-uiverse"
