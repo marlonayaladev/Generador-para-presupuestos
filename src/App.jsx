@@ -443,13 +443,27 @@ const BudgetManagementHome = () => {
     }, 2500);
   };
 
+  // ─── LÓGICA DE DESCARGA DINÁMICA DEL PDF ───
   const handleGenerarCNVPrior = () => {
-    const link = document.createElement('a');
-    link.href = '/CNV PARA PRIORIZACIÓN (2).pdf';
-    link.download = 'CNV PARA PRIORIZACIÓN (2).pdf';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (priorizacionFile) {
+      // Si el usuario subió un archivo, le devolvemos exactamente ese mismo
+      const url = URL.createObjectURL(priorizacionFile);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = priorizacionFile.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else {
+      // Fallback: Si por alguna razón no hay archivo en estado, descargamos el estático
+      const link = document.createElement('a');
+      link.href = '/CNV PARA PRIORIZACIÓN.pdf'; 
+      link.download = 'CNV PARA PRIORIZACIÓN.pdf'; 
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const handleEvalPrograma = (prog) => {
@@ -576,7 +590,6 @@ const BudgetManagementHome = () => {
           transition: all 0.25s; background: rgba(0,0,0,0.25); min-width: 200px;
           margin: 0 auto; text-align: center;
         }
-        /* Fin de correcciones de centrado */
 
         .upload-zone:hover { border-color:#ffcc00; background:rgba(255,204,0,0.05); }
         .upload-zone.cargado { border-color:#4caf50; border-style:solid; background:rgba(76,175,80,0.07); }
@@ -584,7 +597,7 @@ const BudgetManagementHome = () => {
           width:72px; height:72px; border-radius:50%;
           border:3px solid #ffcc00; display:flex; align-items:center;
           justify-content:center; background:rgba(0,0,0,0.3); transition:transform 0.2s;
-          margin: 0 auto; /* Asegura el centrado del icono interno */
+          margin: 0 auto;
         }
         .upload-zone:hover .upload-icon-circle { transform:scale(1.08); }
         .upload-zone.cargado .upload-icon-circle { border-color:#4caf50; }
