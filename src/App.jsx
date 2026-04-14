@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 // ─── DATOS DEL SISTEMA ────────────────────────────────────────────────────────
 
@@ -36,7 +36,6 @@ const INSUMOS_DATA = {
   }
 };
 
-// Especificaciones por keyword para matching automático
 const ESPECIFICAS_KEYWORDS = [
   { keyword: 'mantenimiento', especifica: '2.3.2.4.2.1', nombre: 'SERVICIO DE MANTENIMIENTO, ACONDICIONAMIENTO Y REPARACIONES DE EDIFICACIONES' },
   { keyword: 'servicio',      especifica: '2.3.2.4.2.1', nombre: 'SERVICIO DE MANTENIMIENTO, ACONDICIONAMIENTO Y REPARACIONES DE EDIFICACIONES' },
@@ -64,7 +63,6 @@ const EVALUACION_DATA = {
   'PP 0128': { tiempo: 0.04,  costo: 0.0008,calidad: 0.12  },
 };
 
-// Metas del POI para priorización
 const METAS_POI = [
   'META 1', 'META 2', 'META 3', 'META 4', 'META 5', 'META 6', 'META 7',
   'META 8', 'META 9', 'META 10', 'META 11', 'META 12', 'META 13', 'META 14',
@@ -72,34 +70,15 @@ const METAS_POI = [
   'META 22', 'META 23', 'META 24', 'META 25', 'META 26', 'META 27',
 ];
 
-// Prioridades pre-asignadas según la imagen de referencia
 const PRIORIDADES_PREDEF = {
   'META 1': 0, 'META 3': 0, 'META 4': 0, 'META 6': 0, 'META 13': 0,
   'META 20': 0, 'META 27': 0,
 };
 
-// ─── GENERACIÓN DE PDF en el navegador (usando html2canvas simulation con base64) ─
 function generarPDFHTML(items, especifica1, especifica2, meta, tarea) {
   const total = items.reduce((s, i) => s + (i.total || 0), 0);
   const ahora = new Date();
   const fecha = ahora.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-  const filas = items.map(item => `
-    <tr>
-      <td style="border:1px solid #333;padding:4px 6px;font-size:8px;">${item.id}</td>
-      <td style="border:1px solid #333;padding:4px 6px;font-size:8px;">${item.descripcion}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:center;font-size:8px;">${item.um}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:right;font-size:8px;">S/ ${item.pu.toFixed(2)}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:center;font-size:8px;">${item.cantidad}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:right;font-size:8px;">S/ ${item.total.toLocaleString()}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:center;font-size:8px;">${item.cantidad}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:right;font-size:8px;">S/ ${item.total.toLocaleString()}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:center;font-size:8px;">${item.cantidad}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:right;font-size:8px;">S/ ${item.total.toLocaleString()}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:center;font-size:8px;">${item.cantidad}</td>
-      <td style="border:1px solid #333;padding:4px 6px;text-align:right;font-size:8px;">S/ ${item.total.toLocaleString()}</td>
-    </tr>
-  `).join('');
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -263,15 +242,13 @@ function descargarPDF(htmlContent, filename) {
   URL.revokeObjectURL(url);
 }
 
-// ─── COMPONENTE GAUGE (indicador) ─────────────────────────────────────────────
+// ─── COMPONENTE GAUGE ─────────────────────────────────────────────
 function Gauge({ label, value, descripcion }) {
-  // value entre 0 y 1
   const pct = Math.min(1, Math.max(0, value));
-  const angle = -135 + pct * 270; // de -135° a +135°
+  const angle = -135 + pct * 270;
   const toRad = (d) => (d * Math.PI) / 180;
   const cx = 70, cy = 70, r = 50;
 
-  // Arco de color (segmentado: rojo→amarillo→verde de IZQ a DER)
   const arcPath = (startDeg, endDeg, color) => {
     const s = toRad(startDeg - 90);
     const e = toRad(endDeg - 90);
@@ -283,12 +260,10 @@ function Gauge({ label, value, descripcion }) {
     return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
   };
 
-  // Aguja
   const needleAngle = toRad(angle - 90);
   const nx = cx + 38 * Math.cos(needleAngle);
   const ny = cy + 38 * Math.sin(needleAngle);
 
-  // Color del valor
   const getColor = (v) => {
     if (v < 0.33) return '#e74c3c';
     if (v < 0.66) return '#f39c12';
@@ -298,18 +273,12 @@ function Gauge({ label, value, descripcion }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', maxWidth: 180 }}>
       <svg width="140" height="90" viewBox="0 0 140 100">
-        {/* Track */}
         <path d={arcPath(225, 495, '#333')} fill="none" stroke="#333" strokeWidth="10" />
-        {/* Rojo (225→315) = malo a la IZQUIERDA */}
         <path d={arcPath(225, 315, '#e74c3c')} fill="none" stroke="#e74c3c" strokeWidth="10" />
-        {/* Amarillo (315→405) = medio */}
         <path d={arcPath(315, 405, '#f39c12')} fill="none" stroke="#f39c12" strokeWidth="10" />
-        {/* Verde (405→495) = bueno a la DERECHA */}
         <path d={arcPath(405, 495, '#2ecc71')} fill="none" stroke="#2ecc71" strokeWidth="10" />
-        {/* Aguja */}
         <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="white" strokeWidth="2.5" strokeLinecap="round" />
         <circle cx={cx} cy={cy} r="4" fill="white" />
-        {/* Labels */}
         <text x="20" y="95" fill="#e74c3c" fontSize="9" textAnchor="middle">BAJO</text>
         <text x="70" y="35" fill="#f39c12" fontSize="9" textAnchor="middle">MED</text>
         <text x="120" y="95" fill="#2ecc71" fontSize="9" textAnchor="middle">ALTO</text>
@@ -333,7 +302,6 @@ const BudgetManagementHome = () => {
   const [seleccionMeta, setSeleccionMeta] = useState(null);
   const [seleccionTarea, setSeleccionTarea] = useState(null);
 
-  // Estados de archivos
   const [archivoSubido, setArchivoSubido] = useState(null);
   const [imagenSubida, setImagenSubida] = useState(null);
   const [procesando, setProcesando] = useState(false);
@@ -341,14 +309,12 @@ const BudgetManagementHome = () => {
   const [cnvGenerado, setCnvGenerado] = useState(false);
   const [especificaDetectada, setEspecificaDetectada] = useState(null);
 
-  // Priorización
   const [priorizacionFile, setPriorizacionFile] = useState(null);
   const [analizando, setAnalizando] = useState(false);
   const [metasIdentificadas, setMetasIdentificadas] = useState(false);
   const [cantidadMetas, setCantidadMetas] = useState(7);
   const [prioridades, setPrioridades] = useState({ ...PRIORIDADES_PREDEF });
 
-  // Evaluación
   const [evalPrograma, setEvalPrograma] = useState(null);
   const [evalAnalizando, setEvalAnalizando] = useState(false);
   const [evalResultado, setEvalResultado] = useState(null);
@@ -357,7 +323,11 @@ const BudgetManagementHome = () => {
   const inputImagenRef  = useRef(null);
   const inputPriorRef   = useRef(null);
 
-  // ── DATOS ──
+  useEffect(() => {
+    const img = new Image();
+    img.src = '/logo.jpeg';
+  }, []);
+
   const phases = [
     { id: 'identificacion', name: 'IDENTIFICACIÓN' },
     { id: 'priorizacion',   name: 'PRIORIZACIÓN'   },
@@ -393,7 +363,6 @@ const BudgetManagementHome = () => {
     { id: '0027', label: '0027: PLANEAMIENTO DE OPNS MILITARES CONTRA EL TID' },
   ];
 
-  // ── NAVEGACIÓN ──
   const navStack = {
     identificacion: 'home', recopilar: 'identificacion',
     programas: 'identificacion', productos: 'programas',
@@ -408,7 +377,6 @@ const BudgetManagementHome = () => {
     if (prev) setCurrentView(prev);
   };
 
-  // ── DETECCIÓN DE ESPECIFICAS ──
   const detectarEspecifica = (nombre) => {
     const lower = nombre.toLowerCase();
     for (const kw of ESPECIFICAS_KEYWORDS) {
@@ -419,7 +387,6 @@ const BudgetManagementHome = () => {
     return { especifica: '2.3.1.11.1.1', nombre: 'SUMINISTROS PARA MANTENIMIENTO Y REPARACIÓN PARA EDIFICIOS Y ESTRUCTURAS' };
   };
 
-  // ── GENERACIÓN CNV ──
   const handleGenerarCNV = () => {
     if (!archivoSubido && !imagenSubida) {
       alert('Debe subir al menos un archivo o imagen antes de generar el CNV.');
@@ -461,7 +428,6 @@ const BudgetManagementHome = () => {
     descargarPDF(html, 'CNV_GAPPRE.html');
   };
 
-  // ── PRIORIZACIÓN ──
   const handlePriorFile = (e) => {
     const f = e.target.files[0];
     if (f) setPriorizacionFile(f);
@@ -478,14 +444,14 @@ const BudgetManagementHome = () => {
   };
 
   const handleGenerarCNVPrior = () => {
-    const todos = [...INSUMOS_DATA.especifica1.items, ...INSUMOS_DATA.especifica2.items];
-    const html = generarPDFHTML(todos, INSUMOS_DATA.especifica1, INSUMOS_DATA.especifica2,
-      'META: Operaciones militares de apoyo al control de la oferta de drogas en zonas priorizadas del VRAEM',
-      'TAREA OPERATIVA 0028');
-    descargarPDF(html, 'CNV_Priorizado_GAPPRE.html');
+    const link = document.createElement('a');
+    link.href = '/CNV PARA PRIORIZACIÓN (2).pdf';
+    link.download = 'CNV PARA PRIORIZACIÓN (2).pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  // ── EVALUACIÓN ──
   const handleEvalPrograma = (prog) => {
     setEvalPrograma(prog);
     setEvalAnalizando(true);
@@ -499,7 +465,6 @@ const BudgetManagementHome = () => {
       else {
         clearInterval(iv);
         setEvalAnalizando(false);
-        // Mapear programa al key de evaluacion
         const keyMap = { '032': 'PP 0032', '0074': 'PP 0074', '0135': 'PP 0135', '068': 'PP 0068', '0128': 'PP 0128' };
         setEvalResultado(EVALUACION_DATA[keyMap[prog.id]] || null);
         setCurrentView('evaluacion_resultado');
@@ -507,14 +472,15 @@ const BudgetManagementHome = () => {
     }, 900);
   };
 
-  // ── RENDER ──
   return (
     <>
       <style>{`
         :root, body, #root {
           width: 100vw !important; max-width: 100% !important;
           margin: 0 !important; padding: 0 !important;
-          overflow-x: hidden; background-color: #001C14;
+          overflow-x: hidden; 
+          background: radial-gradient(circle at top center, #0f2b20 0%, #001C14 45%, #000a07 100%) !important;
+          color: white;
         }
         .btn-uiverse {
           width: 260px; height: 65px;
@@ -584,21 +550,46 @@ const BudgetManagementHome = () => {
         .item-lista.activo .radio-circle::after {
           content:""; width:10px; height:10px; background:#ffcc00; border-radius:50%;
         }
+
+        /* CORRECCIONES DE CENTRADO ABSOLUTO (POI y UPLOAD) */
         .bloque-poi {
           background: rgba(255,255,255,0.04); border: 1px solid rgba(255,204,0,0.15);
           border-radius: 12px; padding: 1.5rem 2rem;
-          margin-bottom: 2.5rem; max-width: 820px; width: 100%;
+          margin: 0 auto 2.5rem auto; max-width: 820px; width: 100%;
+          display: flex; flex-direction: column; align-items: center; text-align: center;
         }
         .poi-oe {
           background: rgba(180,220,180,0.1); border: 1px solid rgba(150,200,150,0.25);
-          border-radius: 6px; padding: 0.6rem 1rem; margin-bottom: 1rem;
-          display: flex; align-items: flex-start; gap: 1rem;
+          border-radius: 6px; padding: 0.6rem 1rem; margin: 0 auto 1rem auto;
+          display: flex; align-items: center; justify-content: center; gap: 1rem;
+          width: fit-content;
         }
-        .poi-oe-tag { background:rgba(150,200,150,0.2); color:#a0d8a0; font-size:0.7rem; font-weight:800; padding:3px 8px; border-radius:4px; white-space:nowrap; margin-top:2px; }
-        .poi-oe-text { font-size:0.8rem; color:#c8e6c8; font-weight:600; line-height:1.4; }
-        .poi-ae { font-size:1rem; font-weight:700; color:#e0e0e0; letter-spacing:0.5px; }
-        .poi-ae span { color:#ff6b6b; }
-        .metas-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; width:100%; max-width:820px; }
+        .poi-oe-tag { background:rgba(150,200,150,0.2); color:#a0d8a0; font-size:0.75rem; font-weight:800; padding:4px 10px; border-radius:6px; white-space:nowrap; }
+        .poi-oe-text { font-size:0.85rem; color:#c8e6c8; font-weight:600; line-height:1.4; text-align: center; }
+        .poi-ae { font-size:1rem; font-weight:700; color:#e0e0e0; letter-spacing:0.5px; text-align: center; width: 100%; }
+        .poi-ae span { color:#ffcc00; font-weight: 900; }
+
+        .upload-zone {
+          border: 2px dashed rgba(255,204,0,0.35); border-radius: 16px;
+          padding: 2rem 1.5rem; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 1rem; cursor: pointer;
+          transition: all 0.25s; background: rgba(0,0,0,0.25); min-width: 200px;
+          margin: 0 auto; text-align: center;
+        }
+        /* Fin de correcciones de centrado */
+
+        .upload-zone:hover { border-color:#ffcc00; background:rgba(255,204,0,0.05); }
+        .upload-zone.cargado { border-color:#4caf50; border-style:solid; background:rgba(76,175,80,0.07); }
+        .upload-icon-circle {
+          width:72px; height:72px; border-radius:50%;
+          border:3px solid #ffcc00; display:flex; align-items:center;
+          justify-content:center; background:rgba(0,0,0,0.3); transition:transform 0.2s;
+          margin: 0 auto; /* Asegura el centrado del icono interno */
+        }
+        .upload-zone:hover .upload-icon-circle { transform:scale(1.08); }
+        .upload-zone.cargado .upload-icon-circle { border-color:#4caf50; }
+        
+        .metas-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; width:100%; max-width:820px; margin:0 auto; }
         @media(max-width:640px){ .metas-grid{ grid-template-columns:1fr; } }
         .card-meta {
           background: rgba(0,0,0,0.35); border: 2px solid rgba(255,255,255,0.08);
@@ -609,29 +600,15 @@ const BudgetManagementHome = () => {
         .card-meta:hover { border-color:#ffcc00; background:rgba(255,204,0,0.07); transform:translateY(-3px); }
         .dot-meta { width:14px; height:14px; border-radius:50%; background:#4a8cff; }
         .dot-meta.activo { box-shadow:0 0 10px rgba(74,140,255,0.6); }
-        .upload-zone {
-          border: 2px dashed rgba(255,204,0,0.35); border-radius: 16px;
-          padding: 2rem 1.5rem; display: flex; flex-direction: column;
-          align-items: center; gap: 1rem; cursor: pointer;
-          transition: all 0.25s; background: rgba(0,0,0,0.25); min-width: 200px;
-        }
-        .upload-zone:hover { border-color:#ffcc00; background:rgba(255,204,0,0.05); }
-        .upload-zone.cargado { border-color:#4caf50; border-style:solid; background:rgba(76,175,80,0.07); }
-        .upload-icon-circle {
-          width:72px; height:72px; border-radius:50%;
-          border:3px solid #ffcc00; display:flex; align-items:center;
-          justify-content:center; background:rgba(0,0,0,0.3); transition:transform 0.2s;
-        }
-        .upload-zone:hover .upload-icon-circle { transform:scale(1.08); }
-        .upload-zone.cargado .upload-icon-circle { border-color:#4caf50; }
+        
         .resumen-seleccion {
           background: rgba(0,0,0,0.3); border: 1px solid rgba(255,204,0,0.2);
           border-radius: 12px; padding: 1.25rem 2rem;
-          max-width: 820px; width: 100%; margin-bottom: 2rem;
-          display: flex; align-items: flex-start; gap: 1.5rem; flex-wrap: wrap;
+          max-width: 820px; width: 100%; margin: 0 auto 2rem auto;
+          display: flex; align-items: flex-start; justify-content: center; gap: 1.5rem; flex-wrap: wrap;
         }
         .resumen-label { font-size:0.65rem; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
-        .resumen-valor { font-size:0.85rem; color:#ffcc00; font-weight:700; line-height:1.5; }
+        .resumen-valor { font-size:0.85rem; color:#ffcc00; font-weight:700; line-height:1.5; text-align:center; }
         .resumen-flecha { color:#ffcc00; font-size:1.4rem; opacity:0.5; align-self:center; }
         .btn-accion {
           padding:0.9rem 2.5rem; border-radius:10px;
@@ -656,22 +633,24 @@ const BudgetManagementHome = () => {
         .toast-ok {
           background:rgba(76,175,80,0.12); border:1px solid rgba(76,175,80,0.35);
           color:#a5d6a7; border-radius:10px; padding:1rem 1.5rem;
-          font-size:0.95rem; font-weight:600; max-width:820px; width:100%; text-align:center; margin-top:1.5rem;
+          font-size:0.95rem; font-weight:600; max-width:820px; width:100%; text-align:center; margin: 1.5rem auto 0 auto;
         }
         .esp-badge {
           background:rgba(255,204,0,0.1); border:1px solid rgba(255,204,0,0.4);
-          border-radius:8px; padding:0.75rem 1.25rem; margin-top:1rem;
-          max-width:820px; width:100%;
+          border-radius:8px; padding:0.75rem 1.25rem; margin: 1rem auto 0 auto;
+          max-width:820px; width:100%; text-align:center;
         }
-        .prior-grid { display:grid; grid-template-columns:repeat(3,auto); gap:6px 2rem; }
-        .prior-cell { display:flex; align-items:center; gap:8px; }
+        .prior-grid { 
+          display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); 
+          gap:15px 3rem; justify-items:center; align-items:center; width:100%;
+        }
+        .prior-cell { display:flex; align-items:center; justify-content:center; gap:12px; }
         .prior-input {
           width:50px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,204,0,0.3);
           border-radius:6px; padding:4px 8px; color:#ffcc00; font-weight:bold;
           font-size:0.9rem; text-align:center;
         }
         .prior-input:focus { outline:none; border-color:#ffcc00; }
-        .section-title { font-size:2.5rem; font-weight:900; color:#ffcc00; letter-spacing:4px; text-transform:uppercase; text-align:center; }
       `}</style>
 
       <div className="w-full min-h-screen flex flex-col items-center justify-center py-12 font-sans relative">
@@ -685,10 +664,22 @@ const BudgetManagementHome = () => {
         {/* ══ 1. HOME ══ */}
         {currentView === 'home' && (
           <div className="w-full flex flex-col items-center">
-            <div style={{ width:260, height:260, margin:'0 auto', borderRadius:'50%', overflow:'hidden', border:'4px solid rgba(255,204,0,0.3)', backgroundColor:'#001C14', display:'flex', justifyContent:'center', alignItems:'center', boxShadow:'inset 0 0 20px rgba(0,0,0,0.8), 0 10px 30px rgba(0,0,0,0.5)' }}>
-              <img src="/logo.jpeg" alt="GAPPRE" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+            <div style={{ width: '100%', maxWidth: '380px', margin: '0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <img 
+                src="/logo.jpeg" 
+                alt="GAPPRE" 
+                fetchPriority="high" 
+                loading="eager" 
+                style={{ 
+                  width: '100%', 
+                  height: 'auto', 
+                  objectFit: 'contain', 
+                  mixBlendMode: 'lighten',
+                  filter: 'contrast(1.1)' 
+                }} 
+              />
             </div>
-            <div className="text-center mt-8">
+            <div className="text-center mt-4">
               <h1 className="text-5xl font-extrabold text-[#ffcc00] tracking-widest">GAPPRE</h1>
               <p className="mt-4 text-2xl text-zinc-300 tracking-wide font-light">Generador Automático para la Gestión del Presupuesto por Resultados</p>
             </div>
@@ -863,12 +854,12 @@ const BudgetManagementHome = () => {
               UD HA ELEGIDO FORMULAR SUS NECESIDADES PARA:
             </h1>
             <div className="resumen-seleccion">
-              <div style={{ flex:1 }}>
+              <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
                 <div className="resumen-label">Meta seleccionada</div>
                 <div className="resumen-valor">{seleccionMeta?.label}</div>
               </div>
               <span className="resumen-flecha">→</span>
-              <div style={{ flex:1 }}>
+              <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
                 <div className="resumen-label">Tarea operativa</div>
                 <div className="resumen-valor">{seleccionTarea?.label}</div>
               </div>
@@ -880,6 +871,7 @@ const BudgetManagementHome = () => {
 
             <div style={{ display:'flex', gap:'2rem', flexWrap:'wrap', justifyContent:'center', width:'100%', marginBottom:'2.5rem' }}>
               <div className={`upload-zone ${archivoSubido ? 'cargado' : ''}`}
+                style={{ width: '100%', maxWidth: '280px' }}
                 onClick={() => inputArchivoRef.current?.click()}>
                 <div className="upload-icon-circle">
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none"
@@ -898,6 +890,7 @@ const BudgetManagementHome = () => {
               </div>
 
               <div className={`upload-zone ${imagenSubida ? 'cargado' : ''}`}
+                style={{ width: '100%', maxWidth: '280px' }}
                 onClick={() => inputImagenRef.current?.click()}>
                 <div className="upload-icon-circle">
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none"
@@ -917,7 +910,6 @@ const BudgetManagementHome = () => {
               </div>
             </div>
 
-            {/* Fase de proceso */}
             {procesando && (
               <div style={{ textAlign:'center', marginBottom:'1.5rem', color:'#ffcc00' }}>
                 <div className="pulsing" style={{ fontSize:'1.1rem', fontWeight:700 }}>
@@ -926,7 +918,6 @@ const BudgetManagementHome = () => {
               </div>
             )}
 
-            {/* Específica detectada */}
             {cnvGenerado && especificaDetectada && (
               <div className="esp-badge">
                 <div style={{ fontSize:'0.7rem', color:'#888', marginBottom:4 }}>✅ ESPECÍFICA IDENTIFICADA AUTOMÁTICAMENTE</div>
@@ -973,7 +964,7 @@ const BudgetManagementHome = () => {
               CARGUE LOS CUADROS PARA PRIORIZAR
             </h1>
             <div className={`upload-zone ${priorizacionFile ? 'cargado' : ''}`}
-              style={{ width:200 }}
+              style={{ width: '100%', maxWidth: '280px' }}
               onClick={() => inputPriorRef.current?.click()}>
               <div className="upload-icon-circle">
                 <svg width="34" height="34" viewBox="0 0 24 24" fill="none"
@@ -983,7 +974,7 @@ const BudgetManagementHome = () => {
                   <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
               </div>
-              <span style={{ color:priorizacionFile?'#81c784':'#ffcc00', fontWeight:800 }}>
+              <span style={{ color:priorizacionFile?'#81c784':'#ffcc00', fontWeight:800, textAlign:'center' }}>
                 {priorizacionFile ? priorizacionFile.name : 'SUBIR ARCHIVO'}
               </span>
               <input ref={inputPriorRef} type="file" accept=".pdf,.xlsx,.xls"
@@ -1008,10 +999,9 @@ const BudgetManagementHome = () => {
               ASIGNE UNA PRIORIDAD A LAS METAS IDENTIFICADAS
             </h1>
 
-            {/* Selector de cantidad */}
-            <div style={{ display:'flex', alignItems:'center', gap:'1rem', marginBottom:'2rem',
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'1rem', marginBottom:'2rem',
               background:'rgba(0,0,0,0.3)', padding:'0.75rem 1.5rem', borderRadius:8,
-              border:'1px solid rgba(255,204,0,0.3)' }}>
+              border:'1px solid rgba(255,204,0,0.3)', margin:'0 auto 2rem auto' }}>
               <span style={{ color:'#e0e0e0', fontSize:'0.85rem', fontWeight:600 }}>CANTIDAD DE METAS A PRIORIZAR</span>
               <select value={cantidadMetas}
                 onChange={e => setCantidadMetas(Number(e.target.value))}
@@ -1023,13 +1013,12 @@ const BudgetManagementHome = () => {
               </select>
             </div>
 
-            {/* Grid de metas */}
             <div style={{ background:'rgba(0,0,0,0.25)', border:'1px solid rgba(255,204,0,0.15)',
-              borderRadius:12, padding:'1.5rem 2rem', marginBottom:'2rem', width:'100%', maxWidth:780 }}>
+              borderRadius:12, padding:'2rem 2rem', marginBottom:'2rem', width:'100%', maxWidth:780, margin:'0 auto 2rem auto', display:'flex', justifyContent:'center' }}>
               <div className="prior-grid">
                 {METAS_POI.slice(0, 27).map((meta) => (
                   <div key={meta} className="prior-cell">
-                    <span style={{ color:'#e0e0e0', fontSize:'0.85rem', minWidth:80 }}>{meta}</span>
+                    <span style={{ color:'#e0e0e0', fontSize:'0.85rem', minWidth:80, textAlign:'right' }}>{meta}</span>
                     <input type="number" min="1" max="99"
                       className="prior-input"
                       value={prioridades[meta] || ''}
